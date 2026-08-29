@@ -331,6 +331,8 @@ if (typeof angular !== 'undefined') {
           $scope.companionEnabled = false;
           $scope.companionStatus = 'off'; // 'off' | 'starting' | 'on'
           $scope.companionUrl = '';
+          $scope.companionPort = null;
+          $scope.companionIpDetected = true;
 
           var tripStartMs = null;
           var topSpeedMps = 0;
@@ -371,12 +373,16 @@ if (typeof angular !== 'undefined') {
                   try {
                     var info = JSON.parse(res);
                     $scope.companionStatus = info.running ? 'on' : 'off';
+                    $scope.companionPort = info.running ? info.port : null;
                     $scope.companionUrl = info.running
                       ? 'http://' + (info.ip || '127.0.0.1') + ':' + info.port + '/'
                       : '';
+                    $scope.companionIpDetected = !!info.detected;
                   } catch (e) {
                     $scope.companionStatus = 'off';
                     $scope.companionUrl = '';
+                    $scope.companionPort = null;
+                    $scope.companionIpDetected = true;
                   }
                 });
               });
@@ -389,6 +395,7 @@ if (typeof angular !== 'undefined') {
             }
             $scope.companionStatus = 'off';
             $scope.companionUrl = '';
+            $scope.companionPort = null;
           }
 
           $scope.toggleCompanion = function () {

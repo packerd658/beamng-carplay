@@ -30,14 +30,33 @@ local pendingCommand = nil
 
 local stop -- forward declaration
 
+-- Finds the IP address this machine would use to reach the outside world,
+-- which in practice is its LAN-facing address -- exactly what a phone on
+-- the same WiFi needs to connect back to. This is the standard portable
+-- trick for "what's my own LAN IP": open a UDP socket, "connect" it to an
+-- arbitrary address (UDP connect() just picks a route/local address; it
+-- sends no packets and needs no reachable peer), then read back the local
+-- endpoint with getsockname(). This deliberately avoids hostname/DNS
+-- lookups (dns.gethostname()+dns.toip()) -- those commonly resolve a
+-- machine's own hostname to 127.0.0.1 or a stale/VPN address, which is
+-- exactly the bug this replaces: it was showing 127.0.0.1 to phones,
+-- which can only ever mean "the phone itself" and always fails there.
 local function detectLanIp()
-  local ok, dns = pcall(require, 'socket.dns')
-  if not ok or not dns then return nil end
-  local hostOk, hostname = pcall(dns.gethostname)
-  if not hostOk or type(hostname) ~= 'string' then return nil end
-  local ipOk, ip = pcall(dns.toip, hostname)
-  if not ipOk or type(ip) ~= 'string' then return nil end
-  if ip == '127.0.0.1' or ip:match('^169%.254%.') then return nil end
+  local ok, probe = pcall(socket.udp)
+  if not ok or not probe then return nil end
+
+  local connectOk = select(1, pcall(function()
+    return probe:setpeername('203.0.113.1', 80) -- TEST-NET-3 (RFC 5737): never routed, nothing is sent
+  end))
+  if not connectOk then
+    probe:close()
+    return nil
+  end
+
+  local nameOk, ip = pcall(function() return (probe:getsockname()) end)
+  probe:close()
+  if not nameOk or type(ip) ~= 'string' then return nil end
+  if ip == '0.0.0.0' or ip == '127.0.0.1' or ip:match('^169%.254%.') then return nil end
   return ip
 end
 
@@ -388,10 +407,15 @@ function M.setData(jsonStr)
 end
 
 function M.getInfo()
+  local ip = detectLanIp()
   return json.encode({
     running = running,
     port = listenPort,
-    ip = detectLanIp() or '127.0.0.1'
+    ip = ip or '127.0.0.1',
+    -- false means detection failed and `ip` is just the loopback
+    -- fallback, which will not work from a phone; the UI uses this to
+    -- warn the user instead of silently showing an address that can't work.
+    detected = ip ~= nil
   })
 end
 

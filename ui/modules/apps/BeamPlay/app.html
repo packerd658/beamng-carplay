@@ -153,9 +153,15 @@
         </button>
       </div>
       <div class="bp-about" ng-if="companionEnabled && companionStatus === 'starting'">Starting server&hellip;</div>
-      <div class="bp-about" ng-if="companionEnabled && companionStatus === 'on'">
+      <div class="bp-about" ng-if="companionEnabled && companionStatus === 'on' && companionIpDetected">
         Open on your phone (same WiFi): <strong>{{ companionUrl }}</strong><br/>
         If that doesn't load, use your PC's LAN IP instead of the address shown.
+      </div>
+      <div class="bp-about bp-warning" ng-if="companionEnabled && companionStatus === 'on' && !companionIpDetected">
+        &#9888; Couldn't detect your PC's network address (showing <strong>{{ companionUrl }}</strong>,
+        which only works from this PC). Find your PC's real LAN IP &mdash; Windows: run <code>ipconfig</code> in
+        Command Prompt and look for "IPv4 Address"; Linux/macOS: <code>ip addr</code> or <code>ifconfig</code> &mdash;
+        then open <code>http://&lt;that IP&gt;:{{ companionPort }}/</code> on your phone instead.
       </div>
     </div>
     <div class="bp-setting-row">
