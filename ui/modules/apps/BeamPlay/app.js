@@ -248,6 +248,23 @@ function parseCommand(raw) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+// Decides which host the "open on your phone" URL should use. A
+// user-typed manual override always wins -- it's the one option
+// guaranteed to work no matter what networking APIs BeamNG's Lua sandbox
+// does or doesn't expose (auto-detection has already been wrong once and
+// unavailable once on real installs). Falls back to whatever the Lua
+// server auto-detected, if anything.
+function resolveCompanionHost(manualIp, autoIp, autoDetected) {
+  var manual = (manualIp || '').trim();
+  if (manual) return { host: manual, source: 'manual' };
+  if (autoDetected && autoIp) return { host: autoIp, source: 'auto' };
+  return { host: autoIp || '127.0.0.1', source: 'fallback' };
+}
+
+function buildCompanionUrl(host, port) {
+  return 'http://' + host + ':' + port + '/';
+}
+
 var pureExports = {
   KM_PER_MILE: KM_PER_MILE,
   MPS_TO_KMH: MPS_TO_KMH,
@@ -277,7 +294,9 @@ var pureExports = {
   nextStationIndex: nextStationIndex,
   noteFrequency: noteFrequency,
   buildCompanionPayload: buildCompanionPayload,
-  parseCommand: parseCommand
+  parseCommand: parseCommand,
+  resolveCompanionHost: resolveCompanionHost,
+  buildCompanionUrl: buildCompanionUrl
 };
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -332,7 +351,11 @@ if (typeof angular !== 'undefined') {
           $scope.companionStatus = 'off'; // 'off' | 'starting' | 'on'
           $scope.companionUrl = '';
           $scope.companionPort = null;
-          $scope.companionIpDetected = true;
+          $scope.companionUrlSource = 'fallback'; // 'manual' | 'auto' | 'fallback'
+          $scope.companionManualIp = '';
+
+          var companionAutoIp = null;
+          var companionAutoDetected = false;
 
           var tripStartMs = null;
           var topSpeedMps = 0;
@@ -346,6 +369,7 @@ if (typeof angular !== 'undefined') {
               if (typeof saved.use24h === 'boolean') $scope.use24h = saved.use24h;
               if (typeof saved.radioVolumePct === 'number') $scope.radioVolumePct = saved.radioVolumePct;
               if (typeof saved.companionEnabled === 'boolean') $scope.companionEnabled = saved.companionEnabled;
+              if (typeof saved.companionManualIp === 'string') $scope.companionManualIp = saved.companionManualIp;
             } catch (e) { /* corrupt/missing settings: keep defaults */ }
           }
 
@@ -355,7 +379,8 @@ if (typeof angular !== 'undefined') {
                 unitMode: $scope.unitMode,
                 use24h: $scope.use24h,
                 radioVolumePct: $scope.radioVolumePct,
-                companionEnabled: $scope.companionEnabled
+                companionEnabled: $scope.companionEnabled,
+                companionManualIp: $scope.companionManualIp
               }));
             } catch (e) { /* storage unavailable: settings just won't persist */ }
           }
@@ -363,6 +388,27 @@ if (typeof angular !== 'undefined') {
           loadSettings();
 
           // --- Phone companion server (see lua/ge/extensions/beamPlayServer.lua) ---
+
+          // Recomputes the displayed URL from whatever we currently know
+          // (manual override always wins) without needing another round
+          // trip to Lua -- so typing in the manual IP field updates the
+          // shown URL immediately.
+          function updateCompanionUrl() {
+            if ($scope.companionStatus !== 'on' || !$scope.companionPort) {
+              $scope.companionUrl = '';
+              return;
+            }
+            var resolved = resolveCompanionHost($scope.companionManualIp, companionAutoIp, companionAutoDetected);
+            $scope.companionUrlSource = resolved.source;
+            $scope.companionUrl = buildCompanionUrl(resolved.host, $scope.companionPort);
+          }
+
+          $scope.setCompanionManualIp = function (value) {
+            $scope.companionManualIp = value || '';
+            saveSettings();
+            updateCompanionUrl();
+          };
+
           function startCompanionServer() {
             if (!bngApi || typeof bngApi.engineLua !== 'function') return;
             $scope.companionStatus = 'starting';
@@ -374,16 +420,15 @@ if (typeof angular !== 'undefined') {
                     var info = JSON.parse(res);
                     $scope.companionStatus = info.running ? 'on' : 'off';
                     $scope.companionPort = info.running ? info.port : null;
-                    $scope.companionUrl = info.running
-                      ? 'http://' + (info.ip || '127.0.0.1') + ':' + info.port + '/'
-                      : '';
-                    $scope.companionIpDetected = !!info.detected;
+                    companionAutoIp = info.ip || null;
+                    companionAutoDetected = !!info.detected;
                   } catch (e) {
                     $scope.companionStatus = 'off';
-                    $scope.companionUrl = '';
                     $scope.companionPort = null;
-                    $scope.companionIpDetected = true;
+                    companionAutoIp = null;
+                    companionAutoDetected = false;
                   }
+                  updateCompanionUrl();
                 });
               });
             });
@@ -396,6 +441,8 @@ if (typeof angular !== 'undefined') {
             $scope.companionStatus = 'off';
             $scope.companionUrl = '';
             $scope.companionPort = null;
+            companionAutoIp = null;
+            companionAutoDetected = false;
           }
 
           $scope.toggleCompanion = function () {

@@ -153,20 +153,34 @@
         </button>
       </div>
       <div class="bp-about" ng-if="companionEnabled && companionStatus === 'starting'">Starting server&hellip;</div>
-      <div class="bp-about" ng-if="companionEnabled && companionStatus === 'on' && companionIpDetected">
-        Open on your phone (same WiFi): <strong>{{ companionUrl }}</strong><br/>
-        If that doesn't load, use your PC's LAN IP instead of the address shown.
-      </div>
-      <div class="bp-about bp-warning" ng-if="companionEnabled && companionStatus === 'on' && !companionIpDetected">
-        &#9888; Couldn't detect your PC's network address (showing <strong>{{ companionUrl }}</strong>,
-        which only works from this PC). Find your PC's real LAN IP &mdash; Windows: run <code>ipconfig</code> in
-        Command Prompt and look for "IPv4 Address"; Linux/macOS: <code>ip addr</code> or <code>ifconfig</code> &mdash;
-        then open <code>http://&lt;that IP&gt;:{{ companionPort }}/</code> on your phone instead.
+
+      <div ng-if="companionEnabled && companionStatus === 'on'">
+        <div class="bp-about" ng-if="companionUrlSource !== 'fallback'">
+          Open on your phone (same WiFi): <strong>{{ companionUrl }}</strong>
+          <span ng-if="companionUrlSource === 'manual'">(using the IP you entered below)</span>
+        </div>
+        <div class="bp-about bp-warning" ng-if="companionUrlSource === 'fallback'">
+          &#9888; Couldn't auto-detect your PC's network address. Find it yourself &mdash;
+          Windows: run <code>ipconfig</code> in Command Prompt and look for "IPv4 Address";
+          Linux/macOS: <code>ip addr</code> or <code>ifconfig</code> &mdash; and enter it below.
+        </div>
+        <div class="bp-setting-controls" style="margin-top:8px;">
+          <input
+            class="bp-text-input"
+            type="text"
+            placeholder="e.g. 192.168.1.23"
+            ng-model="companionManualIp"
+            ng-change="setCompanionManualIp(companionManualIp)"
+          />
+        </div>
+        <div class="bp-about" ng-if="companionManualIp">
+          Port: <strong>{{ companionPort }}</strong> &mdash; clear the field above to go back to auto-detection.
+        </div>
       </div>
     </div>
     <div class="bp-setting-row">
       <div class="bp-setting-label">About</div>
-      <div class="bp-setting-controls bp-about">BeamPlay v1.1.0 &mdash; a CarPlay-inspired dash for BeamNG.drive.</div>
+      <div class="bp-setting-controls bp-about">BeamPlay v1.1.1 &mdash; a CarPlay-inspired dash for BeamNG.drive.</div>
     </div>
   </div>
 </div>

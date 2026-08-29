@@ -339,3 +339,17 @@
   padding: 1px 4px;
   border-radius: 4px;
 }
+
+.bp-text-input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font-size: 13px;
+}
+
+.bp-text-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}

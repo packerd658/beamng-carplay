@@ -135,3 +135,35 @@ test('parseCommand: trims, empty/non-string -> null', () => {
   assert.equal(app.parseCommand(null), null);
   assert.equal(app.parseCommand(42), null);
 });
+
+test('resolveCompanionHost: manual override always wins', () => {
+  const r = app.resolveCompanionHost('192.168.1.50', '10.0.0.5', true);
+  assert.equal(r.host, '192.168.1.50');
+  assert.equal(r.source, 'manual');
+});
+
+test('resolveCompanionHost: manual override wins even over a failed auto-detect', () => {
+  const r = app.resolveCompanionHost('  192.168.1.50  ', null, false);
+  assert.equal(r.host, '192.168.1.50');
+  assert.equal(r.source, 'manual');
+});
+
+test('resolveCompanionHost: falls back to auto-detected IP when no manual override', () => {
+  const r = app.resolveCompanionHost('', '10.0.0.5', true);
+  assert.equal(r.host, '10.0.0.5');
+  assert.equal(r.source, 'auto');
+});
+
+test('resolveCompanionHost: reports "fallback" (not "auto") when detection failed', () => {
+  const r = app.resolveCompanionHost('', null, false);
+  assert.equal(r.host, '127.0.0.1');
+  assert.equal(r.source, 'fallback');
+
+  const r2 = app.resolveCompanionHost(undefined, undefined, false);
+  assert.equal(r2.host, '127.0.0.1');
+  assert.equal(r2.source, 'fallback');
+});
+
+test('buildCompanionUrl: host + port -> URL', () => {
+  assert.equal(app.buildCompanionUrl('192.168.1.50', 23515), 'http://192.168.1.50:23515/');
+});
