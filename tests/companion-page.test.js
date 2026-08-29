@@ -36,6 +36,26 @@ test('beamPlayServer.lua routes the paths the companion page and app.js expect',
   assert.match(luaSource, /path == 'command\/reset-trip'/);
 });
 
+test('getInfo() reports whether the LAN IP was actually detected', () => {
+  // Regression guard for the "shows 127.0.0.1 to a phone" bug: getInfo()
+  // must tell the UI whether `ip` is a real detected address or just the
+  // loopback fallback, so the UI can warn instead of showing a dead link.
+  assert.match(luaSource, /detected = ip ~= nil/);
+  assert.match(luaSource, /function M\.getInfo\(\)[\s\S]*?ip = ip or '127\.0\.0\.1'/);
+});
+
+test('detectLanIp does not rely on hostname/DNS resolution', () => {
+  // require('socket.dns') + gethostname()/toip() commonly resolves a
+  // machine's own hostname to 127.0.0.1, which is exactly the bug this
+  // file fixes -- make sure nobody reintroduces that lookup path. (Only
+  // checking the `require` call, not the word "dns", since the file's
+  // own comments describe the old bug using that text.)
+  assert.doesNotMatch(luaSource, /require\('socket\.dns'\)/);
+  assert.match(luaSource, /socket\.udp/);
+  assert.match(luaSource, /setpeername/);
+  assert.match(luaSource, /getsockname/);
+});
+
 test('companion page inline script is syntactically valid JS', () => {
   const html = extractCompanionHtml(luaSource);
   const js = extractInlineScript(html);

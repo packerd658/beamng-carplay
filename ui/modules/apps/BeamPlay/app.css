@@ -323,3 +323,19 @@
   opacity: 0.6;
   line-height: 1.4;
 }
+
+.bp-warning {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 149, 0, 0.14);
+  border: 1px solid rgba(255, 149, 0, 0.35);
+  color: #ffb054;
+  opacity: 1;
+}
+
+.bp-warning code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 4px;
+  border-radius: 4px;
+}
