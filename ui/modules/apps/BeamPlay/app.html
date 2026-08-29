@@ -146,8 +146,21 @@
       </div>
     </div>
     <div class="bp-setting-row">
+      <div class="bp-setting-label">Phone companion</div>
+      <div class="bp-setting-controls">
+        <button class="bp-toggle" ng-class="{ active: companionEnabled }" ng-click="toggleCompanion()">
+          {{ companionEnabled ? 'On' : 'Off' }} (tap to switch)
+        </button>
+      </div>
+      <div class="bp-about" ng-if="companionEnabled && companionStatus === 'starting'">Starting server&hellip;</div>
+      <div class="bp-about" ng-if="companionEnabled && companionStatus === 'on'">
+        Open on your phone (same WiFi): <strong>{{ companionUrl }}</strong><br/>
+        If that doesn't load, use your PC's LAN IP instead of the address shown.
+      </div>
+    </div>
+    <div class="bp-setting-row">
       <div class="bp-setting-label">About</div>
-      <div class="bp-setting-controls bp-about">BeamPlay v1.0.0 &mdash; a CarPlay-inspired dash for BeamNG.drive.</div>
+      <div class="bp-setting-controls bp-about">BeamPlay v1.1.0 &mdash; a CarPlay-inspired dash for BeamNG.drive.</div>
     </div>
   </div>
 </div>
