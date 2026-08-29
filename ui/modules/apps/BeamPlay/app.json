@@ -1,8 +1,8 @@
 {
   "name": "BeamPlay",
   "author": "mheadrick88",
-  "version": "1.0.0",
-  "description": "A CarPlay/Android-Auto-inspired in-car display: dashboard, trip computer, light/status indicators and a built-in synth radio.",
+  "version": "1.1.0",
+  "description": "A CarPlay/Android-Auto-inspired in-car display: dashboard, trip computer, light/status indicators, a built-in synth radio, and an optional phone companion web view.",
   "directive": "beamPlay",
   "domElement": "<beam-play></beam-play>",
   "css": {

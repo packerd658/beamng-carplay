@@ -211,6 +211,43 @@ function noteFrequency(baseFreq, semitoneOffset) {
   return baseFreq * Math.pow(2, semitoneOffset / 12);
 }
 
+// --- Phone companion (local HTTP mirror, see lua/ge/extensions/beamPlayServer.lua) --
+
+// Builds the exact JSON-serializable snapshot pushed to the local web server
+// so a phone on the same network can render a read-only CarPlay-style mirror
+// of the current screen. Keeping this as one pure function means the payload
+// shape is defined (and tested) in exactly one place.
+function buildCompanionPayload(f) {
+  f = f || {};
+  return {
+    engineOn: !!f.engineOn,
+    speedValue: safeNumber(f.speedValue, 0),
+    speedUnit: f.speedUnit || 'km/h',
+    gearText: f.gearText || 'N',
+    rpmPct: safeNumber(f.rpmPct, 0),
+    nearRedline: !!f.nearRedline,
+    fuelPctText: f.fuelPctText || '--',
+    waterTempText: f.waterTempText || '--',
+    oilTempText: f.oilTempText || '--',
+    status: f.status || {},
+    tripDistanceText: f.tripDistanceText || '',
+    tripDurationText: f.tripDurationText || '',
+    tripAvgSpeedText: f.tripAvgSpeedText || '',
+    topSpeedText: f.topSpeedText || '',
+    unitMode: f.unitMode === 'imperial' ? 'imperial' : 'metric',
+    stations: RADIO_STATIONS
+  };
+}
+
+// Normalizes whatever the Lua side hands back for a pending phone-issued
+// command: trims it and turns "", undefined or non-strings into null so
+// callers can do a plain `if (cmd === 'reset-trip')` check.
+function parseCommand(raw) {
+  if (typeof raw !== 'string') return null;
+  var trimmed = raw.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 var pureExports = {
   KM_PER_MILE: KM_PER_MILE,
   MPS_TO_KMH: MPS_TO_KMH,
@@ -238,7 +275,9 @@ var pureExports = {
   resolveDayNight: resolveDayNight,
   RADIO_STATIONS: RADIO_STATIONS,
   nextStationIndex: nextStationIndex,
-  noteFrequency: noteFrequency
+  noteFrequency: noteFrequency,
+  buildCompanionPayload: buildCompanionPayload,
+  parseCommand: parseCommand
 };
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -289,6 +328,10 @@ if (typeof angular !== 'undefined') {
           $scope.radioPlaying = false;
           $scope.radioVolumePct = 60;
 
+          $scope.companionEnabled = false;
+          $scope.companionStatus = 'off'; // 'off' | 'starting' | 'on'
+          $scope.companionUrl = '';
+
           var tripStartMs = null;
           var topSpeedMps = 0;
 
@@ -300,6 +343,7 @@ if (typeof angular !== 'undefined') {
               if (saved.unitMode === 'metric' || saved.unitMode === 'imperial') $scope.unitMode = saved.unitMode;
               if (typeof saved.use24h === 'boolean') $scope.use24h = saved.use24h;
               if (typeof saved.radioVolumePct === 'number') $scope.radioVolumePct = saved.radioVolumePct;
+              if (typeof saved.companionEnabled === 'boolean') $scope.companionEnabled = saved.companionEnabled;
             } catch (e) { /* corrupt/missing settings: keep defaults */ }
           }
 
@@ -308,12 +352,64 @@ if (typeof angular !== 'undefined') {
               localStorage.setItem('beamPlaySettings', JSON.stringify({
                 unitMode: $scope.unitMode,
                 use24h: $scope.use24h,
-                radioVolumePct: $scope.radioVolumePct
+                radioVolumePct: $scope.radioVolumePct,
+                companionEnabled: $scope.companionEnabled
               }));
             } catch (e) { /* storage unavailable: settings just won't persist */ }
           }
 
           loadSettings();
+
+          // --- Phone companion server (see lua/ge/extensions/beamPlayServer.lua) ---
+          function startCompanionServer() {
+            if (!bngApi || typeof bngApi.engineLua !== 'function') return;
+            $scope.companionStatus = 'starting';
+            bngApi.engineLua('extensions.load("beamPlayServer")');
+            bngApi.engineLua('extensions.beamPlayServer.start()', function () {
+              bngApi.engineLua('extensions.beamPlayServer.getInfo()', function (res) {
+                $scope.$evalAsync(function () {
+                  try {
+                    var info = JSON.parse(res);
+                    $scope.companionStatus = info.running ? 'on' : 'off';
+                    $scope.companionUrl = info.running
+                      ? 'http://' + (info.ip || '127.0.0.1') + ':' + info.port + '/'
+                      : '';
+                  } catch (e) {
+                    $scope.companionStatus = 'off';
+                    $scope.companionUrl = '';
+                  }
+                });
+              });
+            });
+          }
+
+          function stopCompanionServer() {
+            if (bngApi && typeof bngApi.engineLua === 'function') {
+              bngApi.engineLua('extensions.beamPlayServer.stop()');
+            }
+            $scope.companionStatus = 'off';
+            $scope.companionUrl = '';
+          }
+
+          $scope.toggleCompanion = function () {
+            $scope.companionEnabled = !$scope.companionEnabled;
+            saveSettings();
+            if ($scope.companionEnabled) startCompanionServer(); else stopCompanionServer();
+          };
+
+          if ($scope.companionEnabled) startCompanionServer();
+
+          var commandPollTimer = $interval(function () {
+            if ($scope.companionStatus !== 'on' || !bngApi || typeof bngApi.engineLua !== 'function') return;
+            bngApi.engineLua('extensions.beamPlayServer.getPendingCommand()', function (raw) {
+              var cmd = parseCommand(raw);
+              if (!cmd) return;
+              bngApi.engineLua('extensions.beamPlayServer.clearPendingCommand()');
+              if (cmd === 'reset-trip') {
+                $scope.$evalAsync(function () { $scope.resetTrip(); });
+              }
+            });
+          }, 500);
 
           $scope.goTo = function (screen) { $scope.screen = screen; };
           $scope.goHome = function () { $scope.screen = 'home'; };
@@ -463,12 +559,35 @@ if (typeof angular !== 'undefined') {
             var avgKmh = computeAverageSpeedKmh(tripDelta, elapsedSeconds);
             var avgConverted = $scope.unitMode === 'imperial' ? avgKmh / KM_PER_MILE : avgKmh;
             $scope.tripAvgSpeedText = avgConverted.toFixed(1) + ' ' + speed.unit;
+
+            if ($scope.companionStatus === 'on' && bngApi && typeof bngApi.engineLua === 'function') {
+              var payload = buildCompanionPayload({
+                engineOn: $scope.engineOn,
+                speedValue: $scope.speedValue,
+                speedUnit: $scope.speedUnit,
+                gearText: $scope.gearText,
+                rpmPct: $scope.rpmPct,
+                nearRedline: $scope.nearRedline,
+                fuelPctText: $scope.fuelPctText,
+                waterTempText: $scope.waterTempText,
+                oilTempText: $scope.oilTempText,
+                status: $scope.status,
+                tripDistanceText: $scope.tripDistanceText,
+                tripDurationText: $scope.tripDurationText,
+                tripAvgSpeedText: $scope.tripAvgSpeedText,
+                topSpeedText: $scope.topSpeedText,
+                unitMode: $scope.unitMode
+              });
+              bngApi.engineLua('extensions.beamPlayServer.setData(' + JSON.stringify(JSON.stringify(payload)) + ')');
+            }
           }
 
           $scope.$on('$destroy', function () {
             StreamsManager.remove(streamsList);
             $interval.cancel(clockTimer);
+            $interval.cancel(commandPollTimer);
             stopRadio();
+            if ($scope.companionStatus !== 'off') stopCompanionServer();
           });
         }]
       };

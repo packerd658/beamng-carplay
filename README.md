@@ -32,37 +32,84 @@ nothing is a static mockup:
   `localStorage` so they survive restarts.
 - A real-world clock and an automatic day/night colour theme in the status
   bar, like an actual CarPlay unit.
+- **Phone companion** (new) — flip "Phone companion" on in Settings and
+  BeamPlay starts a small local web server; open the URL it shows you in
+  your phone's browser (same WiFi network as your PC) for a second,
+  CarPlay-styled screen mirroring live telemetry, with its own independent
+  radio and a working "Reset trip" button that reaches back into the game.
+  See [Phone companion](#phone-companion) below.
+
+### Not actual Apple CarPlay
+
+This mirrors CarPlay's *look*, not Apple's protocol. Real CarPlay requires
+either MFi hardware certification (to appear as a receiver/head unit) or an
+Apple-granted CarPlay entitlement for a narrow set of app categories
+(audio, navigation, messaging, EV charging, etc.) to appear as an app
+inside someone else's CarPlay — neither is realistic for a game mod, and
+both would be a separate iOS project unrelated to this one. The phone
+companion below gets you the "second screen in your hand" experience over
+your own WiFi instead, with no Apple gatekeeping involved.
 
 ## Install (2 minutes)
 
-BeamNG UI apps live in the game's `ui/modules/apps/` folder. The quickest
-way to try BeamPlay is to drop the app folder straight in:
+BeamNG UI apps live in the game's `ui/modules/apps/` folder, and this mod's
+optional server-side piece (used only by the phone companion feature) lives
+in `lua/ge/extensions/`. The quickest way to try BeamPlay is to drop both
+folders straight into your BeamNG install:
 
-1. Locate your BeamNG install's UI apps folder, e.g. on Windows:
-   `C:\Program Files (x86)\Steam\steamapps\common\BeamNG.drive\ui\modules\apps\`
+1. Locate your BeamNG install folder, e.g. on Windows:
+   `C:\Program Files (x86)\Steam\steamapps\common\BeamNG.drive\`
    (or wherever Steam/the standalone installer put it).
-2. Copy this repo's `ui/modules/apps/BeamPlay` folder into that directory,
-   so you end up with
+2. Copy this repo's `ui/modules/apps/BeamPlay` folder into
+   `<install>\ui\modules\apps\`, so you end up with
    `...\BeamNG.drive\ui\modules\apps\BeamPlay\app.json` etc.
-3. Launch BeamNG, load into a vehicle, open the **Apps** menu (top-right
+3. Copy this repo's `lua/ge/extensions/beamPlayServer.lua` into
+   `<install>\lua\ge\extensions\beamPlayServer.lua`. (You can skip this
+   file if you don't want the phone companion feature — everything else
+   works without it.)
+4. Launch BeamNG, load into a vehicle, open the **Apps** menu (top-right
    gear/grid icon in the driving UI) and drag **BeamPlay** onto your
    screen.
 
 ### Installing as a `mods/` package instead
 
 If you'd rather install it the same way downloaded mods work (via
-`Documents/BeamNG.drive/<version>/mods/`), zip up the `ui/` folder here
-(so the zip's root contains `ui/modules/apps/BeamPlay/...`, matching the
-game's own folder layout) into e.g. `BeamPlay.zip`, then drop that zip into
+`Documents/BeamNG.drive/<version>/mods/`), zip up the `ui/` and `lua/`
+folders here (so the zip's root contains both `ui/modules/apps/BeamPlay/...`
+and `lua/ge/extensions/beamPlayServer.lua`, matching the game's own folder
+layout) into e.g. `BeamPlay.zip`, then drop that zip into
 `Documents/BeamNG.drive/<version>/mods/`. BeamNG mounts mod zips without
 unpacking them, and the app will show up in the in-game Apps menu exactly
 the same way.
 
 ```
 # from the repo root:
-zip -r BeamPlay.zip ui
+zip -r BeamPlay.zip ui lua
 # -> BeamPlay.zip, ready to drop in the mods/ folder
 ```
+
+## Phone companion
+
+1. In-game, open BeamPlay's **Settings** screen and tap "Phone companion"
+   to turn it on. BeamPlay loads `beamPlayServer.lua` and starts a small
+   HTTP server (default port `23515`, LAN-only — it's not exposed to the
+   internet).
+2. Settings then shows a URL like `http://192.168.1.23:23515/`. Open that
+   exact address in your phone's browser, as long as the phone is on the
+   **same WiFi network** as your PC.
+3. If the shown address doesn't load (some setups — VPNs, multiple network
+   adapters — make auto-detection guess wrong, and Windows Firewall may
+   prompt to allow the connection the first time), find your PC's actual
+   LAN IP (`ipconfig` on Windows, `ifconfig`/`ip addr` on Linux/macOS) and
+   use `http://<that IP>:23515/` instead.
+4. The phone page polls `/data.json` once a second for live telemetry, and
+   plays its own independent synth radio locally (not audio streamed from
+   the PC — no round trip needed for that). The Trip screen's **Reset
+   trip** button is a real round trip: it hits `/command/reset-trip` on
+   the server, which the game polls and acts on within half a second.
+
+Turning "Phone companion" back off in Settings stops the server. It's also
+stopped automatically if you remove the BeamPlay widget from your HUD.
 
 ## Verifying it works
 
@@ -70,18 +117,21 @@ This repo can't launch BeamNG itself, so verification is split two ways:
 
 1. **Automated** — every piece of logic that doesn't need the game (unit
    conversion, gear-text formatting, RPM-bar math, trip-time formatting,
-   status-flag parsing, radio station cycling, note-frequency math) is a
-   plain, dependency-free JS function, unit tested with Node's built-in
-   test runner:
+   status-flag parsing, radio station cycling, note-frequency math, the
+   phone-companion payload shape) is a plain, dependency-free JS function,
+   unit tested with Node's built-in test runner:
 
    ```
    npm test
    ```
 
-   22 tests cover the math and formatting BeamPlay's UI displays.
+   29 tests cover the math/formatting BeamPlay's UI displays, plus checks
+   that the companion page (embedded as a string in the Lua server) is
+   syntactically valid JS and only reads fields the payload builder
+   actually sends — so the two can't silently drift apart.
 
 2. **Manual, in-game** (do this after installing, to confirm the Angular/
-   BeamNG-glue half — the part that can't run outside the game):
+   BeamNG-glue and Lua halves that can't run outside the game):
    - [ ] App appears in the in-game Apps picker and can be dragged onto the HUD.
    - [ ] Home screen shows five app icons; tapping each opens its screen and
          "‹ Home" returns to the grid.
@@ -95,26 +145,35 @@ This repo can't launch BeamNG itself, so verification is split two ways:
          and the audio changes; the volume slider changes loudness.
    - [ ] Settings: switching Metric/Imperial changes the units shown on
          Dashboard/Trip; the choice survives closing and reopening the app.
+   - [ ] Settings: enabling "Phone companion" shows a URL; that URL loads
+         a matching CarPlay-styled page on a phone on the same WiFi.
+   - [ ] On the phone page: Dashboard/Trip/Status tiles update live; Radio
+         plays audio on the phone itself; **Reset trip** on the phone
+         zeroes the in-game trip screen too.
 
 ## Why the file layout looks like this
 
 ```
 .
-├── ui/modules/apps/BeamPlay/   ← the actual mod (mirrors BeamNG's own folder layout)
-│   ├── app.json                ← manifest: name, default size/position, directive
-│   ├── app.html                ← AngularJS template (home grid + 5 screens)
-│   ├── app.css                 ← styling
-│   ├── app.js                  ← pure logic (Node-testable) + the Angular directive
-│   └── app.png                 ← app-picker icon
-├── generate_icon.py            ← regenerates app.png (Pillow); not needed at runtime
-├── tests/logic.test.js         ← Node test-runner suite for the pure logic in app.js
-├── package.json                ← `npm test` entry point
+├── ui/modules/apps/BeamPlay/    ← the UI app (mirrors BeamNG's own folder layout)
+│   ├── app.json                 ← manifest: name, default size/position, directive
+│   ├── app.html                 ← AngularJS template (home grid + 5 screens)
+│   ├── app.css                  ← styling
+│   ├── app.js                   ← pure logic (Node-testable) + the Angular directive
+│   └── app.png                  ← app-picker icon
+├── lua/ge/extensions/
+│   └── beamPlayServer.lua       ← optional local HTTP server for the phone companion
+├── generate_icon.py             ← regenerates app.png (Pillow); not needed at runtime
+├── tests/
+│   ├── logic.test.js            ← Node test-runner suite for the pure logic in app.js
+│   └── companion-page.test.js   ← validates the Lua-embedded companion page's JS
+├── package.json                 ← `npm test` entry point
 └── README.md
 ```
 
-`ui/modules/apps/BeamPlay/` is exactly the path BeamNG expects inside its
-own install folder or inside a mod zip — that's why it's nested three
-levels deep instead of flattened.
+`ui/modules/apps/BeamPlay/` and `lua/ge/extensions/` are exactly the paths
+BeamNG expects inside its own install folder or inside a mod zip — that's
+why they're nested instead of flattened.
 
 ## Notes on the underlying BeamNG UI API
 
@@ -134,3 +193,13 @@ mods (cross-checked against two independently maintained ones):
   `signal_L`/`signal_R`, `hazard_enabled`, `parkingbrake`) are read
   defensively: if a vehicle/BeamNG version doesn't expose one, BeamPlay
   shows a neutral "n/a"/`--` instead of guessing.
+- The phone companion's server (`lua/ge/extensions/beamPlayServer.lua`) is
+  a GE extension: `extensions.load("beamPlayServer")` from the UI app,
+  then `M.onUpdate` (BeamNG's per-frame extension hook) drives a
+  non-blocking LuaSocket TCP accept/receive loop, matching the approach
+  another published BeamNG mod uses for its own local web endpoint. The UI
+  app pushes a JSON snapshot into the server via
+  `bngApi.engineLua('extensions.beamPlayServer.setData(...)')`; the server
+  itself does no telemetry reading of its own, it only stores and re-serves
+  that string, plus a tiny one-item command queue for the phone's
+  "Reset trip" button.
