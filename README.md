@@ -94,14 +94,17 @@ zip -r BeamPlay.zip ui lua
    to turn it on. BeamPlay loads `beamPlayServer.lua` and starts a small
    HTTP server (default port `23515`, LAN-only — it's not exposed to the
    internet).
-2. Settings then shows a URL like `http://192.168.1.23:23515/`. Open that
-   exact address in your phone's browser, as long as the phone is on the
-   **same WiFi network** as your PC.
-3. If the shown address doesn't load (some setups — VPNs, multiple network
-   adapters — make auto-detection guess wrong, and Windows Firewall may
-   prompt to allow the connection the first time), find your PC's actual
-   LAN IP (`ipconfig` on Windows, `ifconfig`/`ip addr` on Linux/macOS) and
-   use `http://<that IP>:23515/` instead.
+2. Settings then shows a URL. BeamNG's Lua sandbox doesn't reliably expose
+   a way to auto-detect your PC's own network address (this has failed in
+   practice, not just in theory), so **don't count on the auto-detected
+   address working** — Settings also shows a text field for your PC's LAN
+   IP. Find it yourself (`ipconfig` on Windows, look for "IPv4 Address";
+   `ip addr` or `ifconfig` on Linux/macOS) and type it in; the shown URL
+   updates immediately and a manually-entered IP always takes priority
+   over auto-detection.
+3. Open that exact URL in your phone's browser, as long as the phone is on
+   the **same WiFi network** as your PC. Windows Firewall may prompt to
+   allow the connection the first time — allow it.
 4. The phone page polls `/data.json` once a second for live telemetry, and
    plays its own independent synth radio locally (not audio streamed from
    the PC — no round trip needed for that). The Trip screen's **Reset
@@ -125,7 +128,7 @@ This repo can't launch BeamNG itself, so verification is split two ways:
    npm test
    ```
 
-   29 tests cover the math/formatting BeamPlay's UI displays, plus checks
+   36 tests cover the math/formatting BeamPlay's UI displays, plus checks
    that the companion page (embedded as a string in the Lua server) is
    syntactically valid JS and only reads fields the payload builder
    actually sends — so the two can't silently drift apart.
