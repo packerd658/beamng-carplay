@@ -7,7 +7,9 @@ dash, CarPlay/Android-Auto style. It's built entirely on BeamNG's public UI
 modding API — no game files are patched and no third-party audio/map assets
 are bundled.
 
-![BeamPlay icon](ui/modules/apps/BeamPlay/app.png)
+![BeamPlay UI: Home screen, Dashboard, and Radio](img/preview.png)
+
+*Home screen, Dashboard, and Radio — rendered from the mod's actual `app.html`/`app.css` with sample data, not a mockup.*
 
 ## What it actually does
 
