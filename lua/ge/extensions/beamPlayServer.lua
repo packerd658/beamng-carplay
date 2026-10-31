@@ -62,10 +62,11 @@ end
 
 -- Self-contained companion page: no external CSS/JS files, so this one
 -- HTTP response is everything a phone browser needs. Polls /data.json
--- once a second and renders it CarPlay-style; the radio tab plays its
--- own independent Web Audio synth locally on the phone (station
--- definitions come from the polled JSON, so there is nothing to keep in
--- sync by hand).
+-- once a second and renders it CarPlay-style (sidebar nav, a live
+-- position trail, Now Playing, a live-stats ticker); the radio screen
+-- plays its own independent Web Audio synth locally on the phone
+-- (station definitions come from the polled JSON, so there is nothing to
+-- keep in sync by hand). Best viewed with the phone turned sideways.
 local companionHtml = [====[
 <!DOCTYPE html>
 <html>
@@ -75,59 +76,80 @@ local companionHtml = [====[
 <title>BeamPlay</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; height: 100%; background: #060b12; }
+  html, body { margin: 0; padding: 0; height: 100%; background: #120720; }
   body {
     font-family: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    color: #f0f4f8;
-    background: linear-gradient(180deg, #0c1622 0%, #060b12 100%);
-    min-height: 100%;
+    color: #f1edfb;
+    background: linear-gradient(135deg, #2a1152 0%, #190a30 55%, #120720 100%);
+    height: 100%;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
   .statusbar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 18px; font-size: 15px; font-weight: 600;
-    background: rgba(0,0,0,0.25); border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 10px 16px; font-size: 14px; font-weight: 600; flex-shrink: 0;
+    background: rgba(0,0,0,0.22); border-bottom: 1px solid rgba(255,255,255,0.08);
   }
-  .dot { color: #6a7686; }
+  .dot { color: #6a7686; font-size: 10px; }
   .dot.on { color: #33e07a; }
   .conn { font-size: 11px; opacity: 0.6; }
-  .screen { flex: 1; padding: 20px; display: none; }
-  .screen.active { display: block; }
-  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-  .icon { display: flex; flex-direction: column; align-items: center; }
-  .icon-glyph {
-    width: 100%; aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center;
-    border-radius: 22%; font-size: 32px; font-weight: 700;
-    background: linear-gradient(145deg, #1c2b3f, #101a28);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+  .body { display: flex; flex: 1; min-height: 0; }
+  .sidebar {
+    width: 56px; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center;
+    gap: 10px; padding: 10px 0; background: rgba(0,0,0,0.18); border-right: 1px solid rgba(255,255,255,0.07);
   }
-  .icon-label { margin-top: 8px; font-size: 13px; opacity: 0.9; }
-  .back { font-size: 14px; opacity: 0.75; margin-bottom: 16px; }
-  .speed-big { font-size: 72px; font-weight: 800; text-align: center; margin-top: 10px; }
-  .speed-unit { font-size: 20px; font-weight: 600; opacity: 0.7; margin-left: 6px; }
-  .gear { text-align: center; font-size: 24px; font-weight: 700; margin: 8px 0 20px; opacity: 0.85; }
-  .rpm-bar { height: 12px; border-radius: 999px; background: rgba(255,255,255,0.1); overflow: hidden; }
-  .rpm-fill { height: 100%; background: linear-gradient(90deg, #2fbf71, #e0d02f); }
-  .rpm-fill.redline { background: #ff3b30; }
-  .mini-row { display: flex; gap: 12px; margin-top: 24px; }
-  .mini-stat { flex: 1; text-align: center; padding: 14px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); }
-  .mini-label { font-size: 12px; opacity: 0.65; }
-  .mini-value { font-size: 20px; font-weight: 700; margin-top: 4px; }
-  .row { display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 16px; }
+  .nav-spacer { flex: 1; }
+  .nav-icon { cursor: pointer; padding: 4px; border-radius: 12px; }
+  .nav-icon.active { background: rgba(255,255,255,0.1); }
+  .nav-glyph {
+    width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+    border-radius: 30%; font-size: 13px; font-weight: 700; color: #fff;
+    background: linear-gradient(145deg, #3d2766, #241244); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .nav-icon.active .nav-glyph { box-shadow: 0 0 0 2px #7c5cff, inset 0 0 0 1px rgba(255,255,255,0.1); }
+  .nav-drive { background: linear-gradient(145deg, #2f6fed, #1746a2); font-size: 11px; }
+  .nav-trip { background: linear-gradient(145deg, #2fbf71, #177a44); }
+  .nav-status { background: linear-gradient(145deg, #e0a72f, #a06e12); }
+  .nav-radio { background: linear-gradient(145deg, #c04fd6, #7a1f8c); }
+  .main { flex: 1; min-width: 0; overflow-y: auto; }
+  .screen { display: none; height: 100%; box-sizing: border-box; padding: 14px; }
+  .screen.drive { gap: 12px; }
+  .screen.active { display: block; }
+  .screen.drive.active { display: flex; }
+  .card {
+    flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 12px;
+    border-radius: 14px; background: rgba(255,255,255,0.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.6; margin-bottom: 6px; }
+  .position-readout { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .position-map { flex: 1; width: 100%; border-radius: 10px; background: rgba(0,0,0,0.2); }
+  .trail-path { fill: none; stroke: #7c5cff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .trail-dot { fill: #33e07a; stroke: rgba(255,255,255,0.8); stroke-width: 1.5; }
+  .position-hint { margin-top: 8px; font-size: 11px; opacity: 0.55; text-align: center; }
+  .nowplaying-card { align-items: center; justify-content: center; text-align: center; }
+  .np-station { font-size: 18px; font-weight: 700; margin: 6px 0 14px; }
+  .np-controls { display: flex; align-items: center; justify-content: center; gap: 16px; }
+  .np-volume { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 12px; width: 100%; }
+  .np-volume input { flex: 1; }
+  .round { width: 54px; height: 54px; border-radius: 50%; font-size: 18px; border: none; background: rgba(255,255,255,0.1); color: #fff; }
+  .play { width: 66px; height: 66px; font-size: 22px; background: #2fbf71; }
+  .row { display: flex; justify-content: space-between; padding: 10px 4px; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 15px; }
   .row .label { opacity: 0.7; }
   .row .value { font-weight: 700; }
-  .btn { margin-top: 20px; width: 100%; padding: 14px; border: none; border-radius: 12px; background: #2f6fed; color: #fff; font-weight: 700; font-size: 16px; }
-  .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-  .status-cell { text-align: center; padding: 18px 8px; border-radius: 12px; background: rgba(255,255,255,0.05); font-size: 13px; opacity: 0.6; }
+  .btn { margin-top: 18px; width: 100%; padding: 12px; border: none; border-radius: 10px; background: #7c5cff; color: #fff; font-weight: 700; font-size: 15px; }
+  .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .status-cell { text-align: center; padding: 14px 6px; border-radius: 10px; background: rgba(255,255,255,0.05); font-size: 12px; opacity: 0.6; }
   .status-cell.on { opacity: 1; background: rgba(51,224,122,0.16); }
-  .status-glyph { font-size: 26px; margin-bottom: 6px; }
-  .status-val { margin-top: 6px; font-weight: 700; }
-  .radio-station { text-align: center; font-size: 22px; font-weight: 700; margin: 24px 0 20px; }
-  .radio-controls { display: flex; align-items: center; justify-content: center; gap: 22px; }
-  .round { width: 60px; height: 60px; border-radius: 50%; font-size: 20px; border: none; background: rgba(255,255,255,0.1); color: #fff; }
-  .play { width: 74px; height: 74px; font-size: 26px; background: #2fbf71; }
-  .hint { margin-top: 22px; font-size: 12px; opacity: 0.5; text-align: center; }
+  .status-glyph { font-size: 22px; margin-bottom: 4px; }
+  .status-val { margin-top: 4px; font-weight: 700; }
+  .ticker {
+    flex-shrink: 0; display: flex; align-items: center; gap: 8px; margin: 8px 12px 12px;
+    padding: 10px 14px; border-radius: 12px; background: rgba(0,0,0,0.3);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); font-size: 13px; font-weight: 600;
+  }
+  .ticker-text { opacity: 0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hint { margin-top: 18px; font-size: 11px; opacity: 0.5; text-align: center; }
 </style>
 </head>
 <body>
@@ -137,67 +159,74 @@ local companionHtml = [====[
     <span class="conn" id="connStatus">connecting&hellip;</span>
   </div>
 
-  <div class="screen active" data-screen="home">
-    <div class="grid">
-      <div class="icon" onclick="showScreen('dash')">
-        <div class="icon-glyph" id="homeSpeed">0</div>
-        <div class="icon-label">Dashboard</div>
+  <div class="body">
+    <div class="sidebar">
+      <div class="nav-icon active" data-nav="drive" onclick="showScreen('drive')"><div class="nav-glyph nav-drive" id="navSpeed">0</div></div>
+      <div class="nav-icon" data-nav="trip" onclick="showScreen('trip')"><div class="nav-glyph nav-trip">&#9673;</div></div>
+      <div class="nav-icon" data-nav="status" onclick="showScreen('status')"><div class="nav-glyph nav-status">&#9888;</div></div>
+      <div class="nav-icon" data-nav="radio" onclick="showScreen('radio')"><div class="nav-glyph nav-radio">&#9834;</div></div>
+      <div class="nav-spacer"></div>
+    </div>
+
+    <div class="main">
+      <div class="screen drive active" data-screen="drive">
+        <div class="card">
+          <div class="card-title">Live Position</div>
+          <div class="position-readout" id="positionReadout">0 km/h</div>
+          <svg class="position-map" viewBox="0 0 300 180" preserveAspectRatio="xMidYMid meet">
+            <path id="trailPath" class="trail-path" d=""></path>
+            <circle id="trailDot" class="trail-dot" cx="150" cy="90" r="5" style="display:none"></circle>
+          </svg>
+          <div class="position-hint" id="positionHint">Position unavailable &mdash; a live breadcrumb trail, not a road map.</div>
+        </div>
+        <div class="card nowplaying-card">
+          <div class="card-title">Now Playing</div>
+          <div class="np-station" id="radioStationName">&mdash;</div>
+          <div class="np-controls">
+            <button class="round" onclick="changeStation(-1)">&#9198;</button>
+            <button class="round play" id="playBtn" onclick="toggleRadio()">&#9654;</button>
+            <button class="round" onclick="changeStation(1)">&#9197;</button>
+          </div>
+          <div class="np-volume">
+            <span>Vol</span>
+            <input type="range" id="volumeSlider" min="0" max="100" value="60" oninput="setVolume(this.value)"/>
+            <span id="volumeLabel">60%</span>
+          </div>
+        </div>
       </div>
-      <div class="icon" onclick="showScreen('trip')">
-        <div class="icon-glyph">&#128506;</div>
-        <div class="icon-label">Trip</div>
+
+      <div class="screen" data-screen="trip">
+        <div class="row"><span class="label">Distance</span><span class="value" id="tripDistanceText">--</span></div>
+        <div class="row"><span class="label">Duration</span><span class="value" id="tripDurationText">--</span></div>
+        <div class="row"><span class="label">Average speed</span><span class="value" id="tripAvgSpeedText">--</span></div>
+        <div class="row"><span class="label">Top speed</span><span class="value" id="topSpeedText">--</span></div>
+        <button class="btn" onclick="sendCommand('reset-trip')">Reset trip</button>
       </div>
-      <div class="icon" onclick="showScreen('status')">
-        <div class="icon-glyph">&#9888;</div>
-        <div class="icon-label">Status</div>
+
+      <div class="screen" data-screen="status">
+        <div class="status-grid">
+          <div class="status-cell" id="cell-lowbeam"><div class="status-glyph">&#9788;</div><div>Low beam</div><div class="status-val" id="val-lowbeam">n/a</div></div>
+          <div class="status-cell" id="cell-highbeam"><div class="status-glyph">&#9728;</div><div>High beam</div><div class="status-val" id="val-highbeam">n/a</div></div>
+          <div class="status-cell" id="cell-hazard"><div class="status-glyph">&#9650;</div><div>Hazards</div><div class="status-val" id="val-hazard">n/a</div></div>
+          <div class="status-cell" id="cell-parkingBrake"><div class="status-glyph">P</div><div>Parking brake</div><div class="status-val" id="val-parkingBrake">n/a</div></div>
+        </div>
       </div>
-      <div class="icon" onclick="showScreen('radio')">
-        <div class="icon-glyph">&#9834;</div>
-        <div class="icon-label">BeamPlay Radio</div>
+
+      <div class="screen" data-screen="radio">
+        <div class="np-station" id="radioStationNameFull" style="font-size:22px; margin:24px 0 20px;">&mdash;</div>
+        <div class="np-controls">
+          <button class="round" onclick="changeStation(-1)">&#9198;</button>
+          <button class="round play" id="playBtnFull" onclick="toggleRadio()">&#9654;</button>
+          <button class="round" onclick="changeStation(1)">&#9197;</button>
+        </div>
+        <div class="hint">Plays locally on this phone &mdash; independent synth audio, not streamed from the PC.</div>
       </div>
     </div>
   </div>
 
-  <div class="screen" data-screen="dash">
-    <div class="back" onclick="showScreen('home')">&lsaquo; Home</div>
-    <div class="speed-big"><span id="speedValue">0</span><span class="speed-unit" id="speedUnit">km/h</span></div>
-    <div class="gear" id="gearText">N</div>
-    <div class="rpm-bar"><div class="rpm-fill" id="rpmFill" style="width:0%"></div></div>
-    <div class="mini-row">
-      <div class="mini-stat"><div class="mini-label">Fuel</div><div class="mini-value" id="fuelPctText">--</div></div>
-      <div class="mini-stat"><div class="mini-label">Water</div><div class="mini-value" id="waterTempText">--</div></div>
-      <div class="mini-stat"><div class="mini-label">Oil</div><div class="mini-value" id="oilTempText">--</div></div>
-    </div>
-  </div>
-
-  <div class="screen" data-screen="trip">
-    <div class="back" onclick="showScreen('home')">&lsaquo; Home</div>
-    <div class="row"><span class="label">Distance</span><span class="value" id="tripDistanceText">--</span></div>
-    <div class="row"><span class="label">Duration</span><span class="value" id="tripDurationText">--</span></div>
-    <div class="row"><span class="label">Average speed</span><span class="value" id="tripAvgSpeedText">--</span></div>
-    <div class="row"><span class="label">Top speed</span><span class="value" id="topSpeedText">--</span></div>
-    <button class="btn" onclick="sendCommand('reset-trip')">Reset trip</button>
-  </div>
-
-  <div class="screen" data-screen="status">
-    <div class="back" onclick="showScreen('home')">&lsaquo; Home</div>
-    <div class="status-grid">
-      <div class="status-cell" id="cell-lowbeam"><div class="status-glyph">&#9788;</div><div>Low beam</div><div class="status-val" id="val-lowbeam">n/a</div></div>
-      <div class="status-cell" id="cell-highbeam"><div class="status-glyph">&#9728;</div><div>High beam</div><div class="status-val" id="val-highbeam">n/a</div></div>
-      <div class="status-cell" id="cell-hazard"><div class="status-glyph">&#9650;</div><div>Hazards</div><div class="status-val" id="val-hazard">n/a</div></div>
-      <div class="status-cell" id="cell-parkingBrake"><div class="status-glyph">P</div><div>Parking brake</div><div class="status-val" id="val-parkingBrake">n/a</div></div>
-    </div>
-  </div>
-
-  <div class="screen" data-screen="radio">
-    <div class="back" onclick="showScreen('home')">&lsaquo; Home</div>
-    <div class="radio-station" id="radioStationName">&mdash;</div>
-    <div class="radio-controls">
-      <button class="round" onclick="changeStation(-1)">&#9198;</button>
-      <button class="round play" id="playBtn" onclick="toggleRadio()">&#9654;</button>
-      <button class="round" onclick="changeStation(1)">&#9197;</button>
-    </div>
-    <div class="hint">Plays locally on this phone &mdash; independent synth audio, not streamed from the PC.</div>
+  <div class="ticker">
+    <span class="dot" id="tickerDot">&#9679;</span>
+    <span class="ticker-text" id="tickerText">Waiting for telemetry&hellip;</span>
   </div>
 
 <script>
@@ -207,6 +236,9 @@ local companionHtml = [====[
   function showScreen(name) {
     document.querySelectorAll('.screen').forEach(function (el) {
       el.classList.toggle('active', el.getAttribute('data-screen') === name);
+    });
+    document.querySelectorAll('.nav-icon').forEach(function (el) {
+      el.classList.toggle('active', el.getAttribute('data-nav') === name);
     });
   }
   window.showScreen = showScreen;
@@ -227,7 +259,7 @@ local companionHtml = [====[
 
   var lastData = null;
 
-  function setStatusCell(key, label) {
+  function setStatusCell(key) {
     var val = lastData && lastData.status ? lastData.status[key] : null;
     var cell = document.getElementById('cell-' + key);
     var valEl = document.getElementById('val-' + key);
@@ -236,22 +268,61 @@ local companionHtml = [====[
     valEl.textContent = val === null || typeof val === 'undefined' ? 'n/a' : (val ? 'ON' : 'off');
   }
 
+  // --- Live position trail (client-accumulated from polled x/y, same
+  // breadcrumb-plot approach as the in-game widget; lower resolution
+  // here since this only updates once per HTTP poll) ---
+  var trail = [];
+  var TRAIL_MAX = 60;
+
+  function updateTrail(point) {
+    if (!point || typeof point.x !== 'number' || typeof point.y !== 'number') return;
+    var last = trail[trail.length - 1];
+    if (!last || Math.abs(last.x - point.x) > 0.5 || Math.abs(last.y - point.y) > 0.5) {
+      trail.push({ x: point.x, y: point.y });
+    }
+    if (trail.length > TRAIL_MAX) trail = trail.slice(trail.length - TRAIL_MAX);
+  }
+
+  function renderTrail() {
+    var viewW = 300, viewH = 180, pad = 12;
+    var pathEl = document.getElementById('trailPath');
+    var dotEl = document.getElementById('trailDot');
+    if (trail.length < 2) {
+      pathEl.setAttribute('d', '');
+      dotEl.style.display = 'none';
+      return;
+    }
+    var xs = trail.map(function (p) { return p.x; });
+    var ys = trail.map(function (p) { return p.y; });
+    var minX = Math.min.apply(null, xs), maxX = Math.max.apply(null, xs);
+    var minY = Math.min.apply(null, ys), maxY = Math.max.apply(null, ys);
+    var spanX = Math.max(maxX - minX, 1);
+    var spanY = Math.max(maxY - minY, 1);
+    var scale = Math.min((viewW - pad * 2) / spanX, (viewH - pad * 2) / spanY);
+    function project(p) {
+      return { x: pad + (p.x - minX) * scale, y: (viewH - pad) - (p.y - minY) * scale };
+    }
+    var d = trail.map(function (p, i) {
+      var v = project(p);
+      return (i === 0 ? 'M' : 'L') + v.x.toFixed(1) + ',' + v.y.toFixed(1);
+    }).join(' ');
+    pathEl.setAttribute('d', d);
+    var cur = project(trail[trail.length - 1]);
+    dotEl.setAttribute('cx', cur.x.toFixed(1));
+    dotEl.setAttribute('cy', cur.y.toFixed(1));
+    dotEl.style.display = '';
+  }
+
   function render(data) {
     lastData = data;
     document.getElementById('engineDot').classList.toggle('on', !!data.engineOn);
+    document.getElementById('tickerDot').classList.toggle('on', !!data.engineOn);
     document.getElementById('connStatus').textContent = 'connected';
 
-    document.getElementById('homeSpeed').textContent = data.speedValue;
-    document.getElementById('speedValue').textContent = data.speedValue;
-    document.getElementById('speedUnit').textContent = data.speedUnit;
-    document.getElementById('gearText').textContent = data.gearText;
-    var fill = document.getElementById('rpmFill');
-    fill.style.width = Math.max(0, Math.min(100, data.rpmPct || 0)) + '%';
-    fill.classList.toggle('redline', !!data.nearRedline);
-
-    document.getElementById('fuelPctText').textContent = data.fuelPctText;
-    document.getElementById('waterTempText').textContent = data.waterTempText;
-    document.getElementById('oilTempText').textContent = data.oilTempText;
+    document.getElementById('navSpeed').textContent = data.speedValue;
+    document.getElementById('positionReadout').textContent =
+      data.speedValue + ' ' + data.speedUnit +
+      (data.position && data.position.headingText ? '  ·  Heading ' + data.position.headingText : '');
 
     document.getElementById('tripDistanceText').textContent = data.tripDistanceText;
     document.getElementById('tripDurationText').textContent = data.tripDurationText;
@@ -262,6 +333,17 @@ local companionHtml = [====[
     setStatusCell('highbeam');
     setStatusCell('hazard');
     setStatusCell('parkingBrake');
+
+    document.getElementById('tickerText').textContent = data.tickerText || (data.engineOn ? '' : 'Engine off');
+
+    var posEl = document.getElementById('positionHint');
+    if (data.position && data.position.available) {
+      posEl.style.display = 'none';
+      updateTrail(data.position);
+      renderTrail();
+    } else {
+      posEl.style.display = '';
+    }
 
     if (Array.isArray(data.stations) && data.stations.length && !stations.length) {
       stations = data.stations;
@@ -285,10 +367,14 @@ local companionHtml = [====[
   var masterGain = null;
   var stepTimer = null;
   var stepCount = 0;
+  var volumePct = 60;
 
   function renderStationName() {
-    var el = document.getElementById('radioStationName');
-    if (el && stations[stationIndex]) el.textContent = stations[stationIndex].name;
+    var name = stations[stationIndex] ? stations[stationIndex].name : '—';
+    var el1 = document.getElementById('radioStationName');
+    var el2 = document.getElementById('radioStationNameFull');
+    if (el1) el1.textContent = name;
+    if (el2) el2.textContent = name;
   }
 
   function noteFrequency(baseFreq, semis) {
@@ -301,7 +387,7 @@ local companionHtml = [====[
     if (!Ctor) return null;
     audioCtx = new Ctor();
     masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.6;
+    masterGain.gain.value = volumePct / 100;
     masterGain.connect(audioCtx.destination);
     return audioCtx;
   }
@@ -330,6 +416,7 @@ local companionHtml = [====[
     if (stepTimer) { clearInterval(stepTimer); stepTimer = null; }
     playing = false;
     document.getElementById('playBtn').textContent = '▶';
+    document.getElementById('playBtnFull').textContent = '▶';
   }
 
   function startRadio() {
@@ -339,6 +426,7 @@ local companionHtml = [====[
     if (ctx.state === 'suspended' && ctx.resume) ctx.resume();
     playing = true;
     document.getElementById('playBtn').textContent = '⏸';
+    document.getElementById('playBtnFull').textContent = '⏸';
     stepCount = 0;
     var station = stations[stationIndex];
     playStep(station);
@@ -357,6 +445,13 @@ local companionHtml = [====[
     if (playing) { stopRadio(); startRadio(); }
   }
   window.changeStation = changeStation;
+
+  function setVolume(pct) {
+    volumePct = Number(pct) || 0;
+    document.getElementById('volumeLabel').textContent = volumePct + '%';
+    if (masterGain) masterGain.gain.value = volumePct / 100;
+  }
+  window.setVolume = setVolume;
 })();
 </script>
 </body>

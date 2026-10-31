@@ -12,175 +12,187 @@
     <span class="bp-unit-badge">{{ unitMode === 'imperial' ? 'MI' : 'KM' }}</span>
   </div>
 
-  <!-- Home screen: CarPlay-style app grid -->
-  <div class="bp-screen" ng-if="screen === 'home'">
-    <div class="bp-grid">
-      <div class="bp-icon" ng-click="goTo('dash')">
-        <div class="bp-icon-glyph bp-icon-dash">{{ speedValue }}</div>
-        <div class="bp-icon-label">Dashboard</div>
+  <div class="bp-body">
+    <!-- Persistent sidebar nav, CarPlay-style -->
+    <div class="bp-sidebar">
+      <div class="bp-nav-icon" ng-class="{ active: screen === 'drive' }" ng-click="goTo('drive')" title="Drive">
+        <div class="bp-nav-glyph bp-nav-drive">{{ speedValue }}</div>
       </div>
-      <div class="bp-icon" ng-click="goTo('trip')">
-        <div class="bp-icon-glyph bp-icon-trip">🧭</div>
-        <div class="bp-icon-label">Trip</div>
+      <div class="bp-nav-icon" ng-class="{ active: screen === 'trip' }" ng-click="goTo('trip')" title="Trip">
+        <div class="bp-nav-glyph bp-nav-trip">&#9673;</div>
       </div>
-      <div class="bp-icon" ng-click="goTo('status')">
-        <div class="bp-icon-glyph bp-icon-status">⚠</div>
-        <div class="bp-icon-label">Status</div>
+      <div class="bp-nav-icon" ng-class="{ active: screen === 'status' }" ng-click="goTo('status')" title="Status">
+        <div class="bp-nav-glyph bp-nav-status">&#9888;</div>
       </div>
-      <div class="bp-icon" ng-click="goTo('radio')">
-        <div class="bp-icon-glyph bp-icon-radio">♪</div>
-        <div class="bp-icon-label">BeamPlay Radio</div>
+      <div class="bp-nav-icon" ng-class="{ active: screen === 'radio' }" ng-click="goTo('radio')" title="BeamPlay Radio">
+        <div class="bp-nav-glyph bp-nav-radio">&#9834;</div>
       </div>
-      <div class="bp-icon" ng-click="goTo('settings')">
-        <div class="bp-icon-glyph bp-icon-settings">⚙</div>
-        <div class="bp-icon-label">Settings</div>
+      <div class="bp-nav-spacer"></div>
+      <div class="bp-nav-icon" ng-class="{ active: screen === 'settings' }" ng-click="goTo('settings')" title="Settings">
+        <div class="bp-nav-glyph bp-nav-settings">&#9881;</div>
       </div>
     </div>
-  </div>
 
-  <!-- Dashboard screen -->
-  <div class="bp-screen" ng-if="screen === 'dash'">
-    <div class="bp-back" ng-click="goHome()">‹ Home</div>
-    <div class="bp-speed-big">{{ speedValue }}<span class="bp-speed-unit">{{ speedUnit }}</span></div>
-    <div class="bp-gear">{{ gearText }}</div>
-    <div class="bp-rpm-bar">
-      <div class="bp-rpm-fill" ng-class="{ 'bp-rpm-redline': nearRedline }" ng-style="{ width: rpmPct + '%' }"></div>
-    </div>
-    <div class="bp-rpm-label">{{ rpmPct }}% RPM</div>
-    <div class="bp-mini-row">
-      <div class="bp-mini-stat">
-        <div class="bp-mini-label">Fuel</div>
-        <div class="bp-mini-value">{{ fuelPctText }}</div>
-      </div>
-      <div class="bp-mini-stat">
-        <div class="bp-mini-label">Water</div>
-        <div class="bp-mini-value">{{ waterTempText }}</div>
-      </div>
-      <div class="bp-mini-stat">
-        <div class="bp-mini-label">Oil</div>
-        <div class="bp-mini-value">{{ oilTempText }}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Trip screen -->
-  <div class="bp-screen" ng-if="screen === 'trip'">
-    <div class="bp-back" ng-click="goHome()">‹ Home</div>
-    <div class="bp-trip-row">
-      <div class="bp-trip-label">Distance</div>
-      <div class="bp-trip-value">{{ tripDistanceText }}</div>
-    </div>
-    <div class="bp-trip-row">
-      <div class="bp-trip-label">Duration</div>
-      <div class="bp-trip-value">{{ tripDurationText }}</div>
-    </div>
-    <div class="bp-trip-row">
-      <div class="bp-trip-label">Average speed</div>
-      <div class="bp-trip-value">{{ tripAvgSpeedText }}</div>
-    </div>
-    <div class="bp-trip-row">
-      <div class="bp-trip-label">Top speed</div>
-      <div class="bp-trip-value">{{ topSpeedText }}</div>
-    </div>
-    <button class="bp-button" ng-click="resetTrip()">Reset trip</button>
-  </div>
-
-  <!-- Status screen -->
-  <div class="bp-screen" ng-if="screen === 'status'">
-    <div class="bp-back" ng-click="goHome()">‹ Home</div>
-    <div class="bp-status-grid">
-      <div class="bp-status-cell" ng-class="{ 'bp-on': status.lowbeam === true }">
-        <div class="bp-status-glyph">☼</div>
-        <div>Low beam</div>
-        <div class="bp-status-val">{{ status.lowbeam === null ? 'n/a' : (status.lowbeam ? 'ON' : 'off') }}</div>
-      </div>
-      <div class="bp-status-cell" ng-class="{ 'bp-on': status.highbeam === true }">
-        <div class="bp-status-glyph">☀</div>
-        <div>High beam</div>
-        <div class="bp-status-val">{{ status.highbeam === null ? 'n/a' : (status.highbeam ? 'ON' : 'off') }}</div>
-      </div>
-      <div class="bp-status-cell" ng-class="{ 'bp-on': status.hazard === true }">
-        <div class="bp-status-glyph">▲</div>
-        <div>Hazards</div>
-        <div class="bp-status-val">{{ status.hazard === null ? 'n/a' : (status.hazard ? 'ON' : 'off') }}</div>
-      </div>
-      <div class="bp-status-cell" ng-class="{ 'bp-on': status.parkingBrake === true }">
-        <div class="bp-status-glyph">P</div>
-        <div>Parking brake</div>
-        <div class="bp-status-val">{{ status.parkingBrake === null ? 'n/a' : (status.parkingBrake ? 'ON' : 'off') }}</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Radio screen -->
-  <div class="bp-screen" ng-if="screen === 'radio'">
-    <div class="bp-back" ng-click="goHome()">‹ Home</div>
-    <div class="bp-radio-station">{{ stations[stationIndex].name }}</div>
-    <div class="bp-radio-controls">
-      <button class="bp-button bp-round" ng-click="changeStation(-1)">⏮</button>
-      <button class="bp-button bp-round bp-play" ng-click="toggleRadio()">{{ radioPlaying ? '⏸' : '▶' }}</button>
-      <button class="bp-button bp-round" ng-click="changeStation(1)">⏭</button>
-    </div>
-    <div class="bp-radio-volume">
-      <span>Vol</span>
-      <input type="range" min="0" max="100" ng-model="radioVolumePct" ng-change="setVolume(radioVolumePct)" />
-      <span>{{ radioVolumePct }}%</span>
-    </div>
-    <div class="bp-radio-hint">Procedurally generated audio &mdash; no external files.</div>
-  </div>
-
-  <!-- Settings screen -->
-  <div class="bp-screen" ng-if="screen === 'settings'">
-    <div class="bp-back" ng-click="goHome()">‹ Home</div>
-    <div class="bp-setting-row">
-      <div class="bp-setting-label">Units</div>
-      <div class="bp-setting-controls">
-        <button class="bp-toggle" ng-class="{ active: unitMode === 'metric' }" ng-click="setUnitMode('metric')">Metric</button>
-        <button class="bp-toggle" ng-class="{ active: unitMode === 'imperial' }" ng-click="setUnitMode('imperial')">Imperial</button>
-      </div>
-    </div>
-    <div class="bp-setting-row">
-      <div class="bp-setting-label">Clock format</div>
-      <div class="bp-setting-controls">
-        <button class="bp-toggle" ng-click="toggleClockFormat()">{{ use24h ? '24h' : '12h' }} (tap to switch)</button>
-      </div>
-    </div>
-    <div class="bp-setting-row">
-      <div class="bp-setting-label">Phone companion</div>
-      <div class="bp-setting-controls">
-        <button class="bp-toggle" ng-class="{ active: companionEnabled }" ng-click="toggleCompanion()">
-          {{ companionEnabled ? 'On' : 'Off' }} (tap to switch)
-        </button>
-      </div>
-      <div class="bp-about" ng-if="companionEnabled && companionStatus === 'starting'">Starting server&hellip;</div>
-
-      <div ng-if="companionEnabled && companionStatus === 'on'">
-        <div class="bp-about" ng-if="companionUrlSource !== 'fallback'">
-          Open on your phone (same WiFi): <strong>{{ companionUrl }}</strong>
-          <span ng-if="companionUrlSource === 'manual'">(using the IP you entered below)</span>
+    <div class="bp-main">
+      <!-- Drive: default split-pane home, Live Position + Now Playing -->
+      <div class="bp-screen bp-drive" ng-if="screen === 'drive'">
+        <div class="bp-card bp-position-card">
+          <div class="bp-card-title">Live Position</div>
+          <div class="bp-position-readout">
+            {{ speedValue }} {{ speedUnit }} &nbsp;&middot;&nbsp; Heading {{ headingText }}
+          </div>
+          <svg class="bp-position-map" viewBox="0 0 300 180" preserveAspectRatio="xMidYMid meet">
+            <path ng-attr-d="{{ trailPath }}" class="bp-trail-path"></path>
+            <circle
+              ng-if="positionAvailable"
+              ng-attr-cx="{{ trailCurrentX }}"
+              ng-attr-cy="{{ trailCurrentY }}"
+              r="5"
+              class="bp-trail-dot"
+            ></circle>
+          </svg>
+          <div class="bp-position-hint" ng-if="!positionAvailable">
+            Position unavailable &mdash; a live breadcrumb trail, not a road map.
+          </div>
         </div>
-        <div class="bp-about bp-warning" ng-if="companionUrlSource === 'fallback'">
-          &#9888; Couldn't auto-detect your PC's network address. Find it yourself &mdash;
-          Windows: run <code>ipconfig</code> in Command Prompt and look for "IPv4 Address";
-          Linux/macOS: <code>ip addr</code> or <code>ifconfig</code> &mdash; and enter it below.
-        </div>
-        <div class="bp-setting-controls" style="margin-top:8px;">
-          <input
-            class="bp-text-input"
-            type="text"
-            placeholder="e.g. 192.168.1.23"
-            ng-model="companionManualIp"
-            ng-change="setCompanionManualIp(companionManualIp)"
-          />
-        </div>
-        <div class="bp-about" ng-if="companionManualIp">
-          Port: <strong>{{ companionPort }}</strong> &mdash; clear the field above to go back to auto-detection.
+
+        <div class="bp-card bp-nowplaying-card">
+          <div class="bp-card-title">Now Playing</div>
+          <div class="bp-np-station">{{ stations[stationIndex].name }}</div>
+          <div class="bp-np-controls">
+            <button class="bp-button bp-round" ng-click="changeStation(-1)">⏮</button>
+            <button class="bp-button bp-round bp-play" ng-click="toggleRadio()">{{ radioPlaying ? '⏸' : '▶' }}</button>
+            <button class="bp-button bp-round" ng-click="changeStation(1)">⏭</button>
+          </div>
+          <div class="bp-np-volume">
+            <span>Vol</span>
+            <input type="range" min="0" max="100" ng-model="radioVolumePct" ng-change="setVolume(radioVolumePct)" />
+            <span>{{ radioVolumePct }}%</span>
+          </div>
         </div>
       </div>
+
+      <!-- Trip -->
+      <div class="bp-screen" ng-if="screen === 'trip'">
+        <div class="bp-trip-row">
+          <div class="bp-trip-label">Distance</div>
+          <div class="bp-trip-value">{{ tripDistanceText }}</div>
+        </div>
+        <div class="bp-trip-row">
+          <div class="bp-trip-label">Duration</div>
+          <div class="bp-trip-value">{{ tripDurationText }}</div>
+        </div>
+        <div class="bp-trip-row">
+          <div class="bp-trip-label">Average speed</div>
+          <div class="bp-trip-value">{{ tripAvgSpeedText }}</div>
+        </div>
+        <div class="bp-trip-row">
+          <div class="bp-trip-label">Top speed</div>
+          <div class="bp-trip-value">{{ topSpeedText }}</div>
+        </div>
+        <button class="bp-button" ng-click="resetTrip()">Reset trip</button>
+      </div>
+
+      <!-- Status -->
+      <div class="bp-screen" ng-if="screen === 'status'">
+        <div class="bp-status-grid">
+          <div class="bp-status-cell" ng-class="{ 'bp-on': status.lowbeam === true }">
+            <div class="bp-status-glyph">☼</div>
+            <div>Low beam</div>
+            <div class="bp-status-val">{{ status.lowbeam === null ? 'n/a' : (status.lowbeam ? 'ON' : 'off') }}</div>
+          </div>
+          <div class="bp-status-cell" ng-class="{ 'bp-on': status.highbeam === true }">
+            <div class="bp-status-glyph">☀</div>
+            <div>High beam</div>
+            <div class="bp-status-val">{{ status.highbeam === null ? 'n/a' : (status.highbeam ? 'ON' : 'off') }}</div>
+          </div>
+          <div class="bp-status-cell" ng-class="{ 'bp-on': status.hazard === true }">
+            <div class="bp-status-glyph">▲</div>
+            <div>Hazards</div>
+            <div class="bp-status-val">{{ status.hazard === null ? 'n/a' : (status.hazard ? 'ON' : 'off') }}</div>
+          </div>
+          <div class="bp-status-cell" ng-class="{ 'bp-on': status.parkingBrake === true }">
+            <div class="bp-status-glyph">P</div>
+            <div>Parking brake</div>
+            <div class="bp-status-val">{{ status.parkingBrake === null ? 'n/a' : (status.parkingBrake ? 'ON' : 'off') }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Radio (full screen) -->
+      <div class="bp-screen" ng-if="screen === 'radio'">
+        <div class="bp-radio-station">{{ stations[stationIndex].name }}</div>
+        <div class="bp-radio-controls">
+          <button class="bp-button bp-round" ng-click="changeStation(-1)">⏮</button>
+          <button class="bp-button bp-round bp-play" ng-click="toggleRadio()">{{ radioPlaying ? '⏸' : '▶' }}</button>
+          <button class="bp-button bp-round" ng-click="changeStation(1)">⏭</button>
+        </div>
+        <div class="bp-radio-volume">
+          <span>Vol</span>
+          <input type="range" min="0" max="100" ng-model="radioVolumePct" ng-change="setVolume(radioVolumePct)" />
+          <span>{{ radioVolumePct }}%</span>
+        </div>
+        <div class="bp-radio-hint">Procedurally generated audio &mdash; no external files.</div>
+      </div>
+
+      <!-- Settings -->
+      <div class="bp-screen" ng-if="screen === 'settings'">
+        <div class="bp-setting-row">
+          <div class="bp-setting-label">Units</div>
+          <div class="bp-setting-controls">
+            <button class="bp-toggle" ng-class="{ active: unitMode === 'metric' }" ng-click="setUnitMode('metric')">Metric</button>
+            <button class="bp-toggle" ng-class="{ active: unitMode === 'imperial' }" ng-click="setUnitMode('imperial')">Imperial</button>
+          </div>
+        </div>
+        <div class="bp-setting-row">
+          <div class="bp-setting-label">Clock format</div>
+          <div class="bp-setting-controls">
+            <button class="bp-toggle" ng-click="toggleClockFormat()">{{ use24h ? '24h' : '12h' }} (tap to switch)</button>
+          </div>
+        </div>
+        <div class="bp-setting-row">
+          <div class="bp-setting-label">Phone companion</div>
+          <div class="bp-setting-controls">
+            <button class="bp-toggle" ng-class="{ active: companionEnabled }" ng-click="toggleCompanion()">
+              {{ companionEnabled ? 'On' : 'Off' }} (tap to switch)
+            </button>
+          </div>
+          <div class="bp-about" ng-if="companionEnabled && companionStatus === 'starting'">Starting server&hellip;</div>
+
+          <div ng-if="companionEnabled && companionStatus === 'on'">
+            <div class="bp-about" ng-if="companionUrlSource !== 'fallback'">
+              Open on your phone (same WiFi): <strong>{{ companionUrl }}</strong>
+              <span ng-if="companionUrlSource === 'manual'">(using the IP you entered below)</span>
+            </div>
+            <div class="bp-about bp-warning" ng-if="companionUrlSource === 'fallback'">
+              &#9888; Couldn't auto-detect your PC's network address. Find it yourself &mdash;
+              Windows: run <code>ipconfig</code> in Command Prompt and look for "IPv4 Address";
+              Linux/macOS: <code>ip addr</code> or <code>ifconfig</code> &mdash; and enter it below.
+            </div>
+            <div class="bp-setting-controls" style="margin-top:8px;">
+              <input
+                class="bp-text-input"
+                type="text"
+                placeholder="e.g. 192.168.1.23"
+                ng-model="companionManualIp"
+                ng-change="setCompanionManualIp(companionManualIp)"
+              />
+            </div>
+            <div class="bp-about" ng-if="companionManualIp">
+              Port: <strong>{{ companionPort }}</strong> &mdash; clear the field above to go back to auto-detection.
+            </div>
+          </div>
+        </div>
+        <div class="bp-setting-row">
+          <div class="bp-setting-label">About</div>
+          <div class="bp-setting-controls bp-about">BeamPlay v2.0.0 &mdash; a CarPlay-inspired dash for BeamNG.drive.</div>
+        </div>
+      </div>
     </div>
-    <div class="bp-setting-row">
-      <div class="bp-setting-label">About</div>
-      <div class="bp-setting-controls bp-about">BeamPlay v1.1.1 &mdash; a CarPlay-inspired dash for BeamNG.drive.</div>
-    </div>
+  </div>
+
+  <div class="bp-ticker">
+    <span class="bp-ticker-dot" ng-class="{ on: engineOn }">&#9679;</span>
+    <span class="bp-ticker-text">{{ tickerText || (engineOn ? 'Waiting for telemetry&hellip;' : 'Engine off') }}</span>
   </div>
 </div>

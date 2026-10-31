@@ -102,6 +102,10 @@ test('buildCompanionPayload: shape and defensive defaults', () => {
   assert.equal(empty.unitMode, 'metric');
   assert.deepEqual(empty.status, {});
   assert.equal(empty.stations, app.RADIO_STATIONS);
+  assert.equal(empty.tickerText, '');
+  assert.equal(empty.position.available, false);
+  assert.equal(empty.position.x, null);
+  assert.equal(empty.position.headingText, '--');
 
   const full = app.buildCompanionPayload({
     engineOn: true,
@@ -118,12 +122,18 @@ test('buildCompanionPayload: shape and defensive defaults', () => {
     tripDurationText: '5:00',
     tripAvgSpeedText: '60.0 km/h',
     topSpeedText: '110.0 km/h',
-    unitMode: 'imperial'
+    unitMode: 'imperial',
+    tickerText: '87 mph  ·  Gear 4',
+    position: { available: true, x: 120.5, y: -40.2, headingText: 'NE' }
   });
   assert.equal(full.engineOn, true);
   assert.equal(full.speedValue, 87);
   assert.equal(full.unitMode, 'imperial');
   assert.equal(full.status.lowbeam, true);
+  assert.equal(full.tickerText, '87 mph  ·  Gear 4');
+  assert.equal(full.position.available, true);
+  assert.equal(full.position.x, 120.5);
+  assert.equal(full.position.headingText, 'NE');
 });
 
 test('parseCommand: trims, empty/non-string -> null', () => {
