@@ -211,6 +211,89 @@ function noteFrequency(baseFreq, semitoneOffset) {
   return baseFreq * Math.pow(2, semitoneOffset / 12);
 }
 
+// --- Live position (breadcrumb trail, not a road map -- see beamPlayPosition.lua) --
+
+// Appends a world-space point to the trail if the vehicle has actually
+// moved since the last sample (half a metre threshold keeps a stationary
+// car from flooding the trail with duplicate points), then trims to the
+// most recent `maxPoints`. Pure, so the throttling/trimming logic is
+// testable without a live stream.
+function updatePositionTrail(trail, point, maxPoints) {
+  var next = Array.isArray(trail) ? trail.slice() : [];
+  if (point && isFiniteNumber(point.x) && isFiniteNumber(point.y)) {
+    var last = next[next.length - 1];
+    if (!last || Math.abs(last.x - point.x) > 0.5 || Math.abs(last.y - point.y) > 0.5) {
+      next.push({ x: point.x, y: point.y });
+    }
+  }
+  var max = typeof maxPoints === 'number' && maxPoints > 0 ? maxPoints : 200;
+  if (next.length > max) next = next.slice(next.length - max);
+  return next;
+}
+
+// Projects a world-space trail onto an SVG viewBox of size viewW x viewH,
+// auto-scaling to fit the trail's own bounding box (there's no fixed map
+// scale -- this is a relative "where have you been" plot, not a
+// to-scale map). Returns an SVG path `d` string plus the current
+// (most recent) point's view-space coordinates, so the caller can place
+// a "you are here" marker without recomputing the same projection.
+function buildTrailView(trail, viewW, viewH, paddingPx) {
+  var pad = typeof paddingPx === 'number' ? paddingPx : 12;
+  var center = { x: viewW / 2, y: viewH / 2 };
+  if (!Array.isArray(trail) || trail.length === 0) {
+    return { path: '', currentX: center.x, currentY: center.y, hasData: false };
+  }
+  if (trail.length === 1) {
+    return { path: '', currentX: center.x, currentY: center.y, hasData: true };
+  }
+
+  var xs = trail.map(function (p) { return p.x; });
+  var ys = trail.map(function (p) { return p.y; });
+  var minX = Math.min.apply(null, xs);
+  var maxX = Math.max.apply(null, xs);
+  var minY = Math.min.apply(null, ys);
+  var maxY = Math.max.apply(null, ys);
+  var spanX = Math.max(maxX - minX, 1);
+  var spanY = Math.max(maxY - minY, 1);
+  var scale = Math.min((viewW - pad * 2) / spanX, (viewH - pad * 2) / spanY);
+
+  function project(p) {
+    return {
+      x: pad + (p.x - minX) * scale,
+      y: (viewH - pad) - (p.y - minY) * scale // flip: screen Y grows downward
+    };
+  }
+
+  var path = trail.map(function (p, i) {
+    var v = project(p);
+    return (i === 0 ? 'M' : 'L') + v.x.toFixed(1) + ',' + v.y.toFixed(1);
+  }).join(' ');
+
+  var current = project(trail[trail.length - 1]);
+  return { path: path, currentX: current.x, currentY: current.y, hasData: true };
+}
+
+function headingToCompass(headingDeg) {
+  if (!isFiniteNumber(headingDeg)) return '--';
+  var dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  var normalized = ((headingDeg % 360) + 360) % 360;
+  var idx = Math.round(normalized / 45) % 8;
+  return dirs[idx];
+}
+
+// Single-line live-stats readout for the bottom ticker bar (replaces a
+// fake voice-assistant prompt with real telemetry).
+function buildStatusTicker(f) {
+  f = f || {};
+  var parts = [];
+  if (isFiniteNumber(f.speedValue) && f.speedUnit) parts.push(f.speedValue + ' ' + f.speedUnit);
+  if (f.gearText) parts.push('Gear ' + f.gearText);
+  if (isFiniteNumber(f.rpmPct)) parts.push(f.rpmPct + '% RPM');
+  if (f.fuelPctText && f.fuelPctText !== '--') parts.push('Fuel ' + f.fuelPctText);
+  if (f.waterTempText && f.waterTempText !== '--') parts.push(f.waterTempText + ' water');
+  return parts.join('  ·  ');
+}
+
 // --- Phone companion (local HTTP mirror, see lua/ge/extensions/beamPlayServer.lua) --
 
 // Builds the exact JSON-serializable snapshot pushed to the local web server
@@ -235,7 +318,14 @@ function buildCompanionPayload(f) {
     tripAvgSpeedText: f.tripAvgSpeedText || '',
     topSpeedText: f.topSpeedText || '',
     unitMode: f.unitMode === 'imperial' ? 'imperial' : 'metric',
-    stations: RADIO_STATIONS
+    stations: RADIO_STATIONS,
+    tickerText: f.tickerText || '',
+    position: {
+      available: !!(f.position && f.position.available),
+      x: f.position && isFiniteNumber(f.position.x) ? f.position.x : null,
+      y: f.position && isFiniteNumber(f.position.y) ? f.position.y : null,
+      headingText: f.position && f.position.headingText ? f.position.headingText : '--'
+    }
   };
 }
 
@@ -296,7 +386,11 @@ var pureExports = {
   buildCompanionPayload: buildCompanionPayload,
   parseCommand: parseCommand,
   resolveCompanionHost: resolveCompanionHost,
-  buildCompanionUrl: buildCompanionUrl
+  buildCompanionUrl: buildCompanionUrl,
+  updatePositionTrail: updatePositionTrail,
+  buildTrailView: buildTrailView,
+  headingToCompass: headingToCompass,
+  buildStatusTicker: buildStatusTicker
 };
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -317,10 +411,13 @@ if (typeof angular !== 'undefined') {
         restrict: 'EA',
         scope: true,
         controller: ['$scope', '$interval', function ($scope, $interval) {
-          var streamsList = ['electrics', 'engineInfo'];
+          var streamsList = ['electrics', 'engineInfo', 'beamPlayPosition'];
           StreamsManager.add(streamsList);
+          if (bngApi && typeof bngApi.engineLua === 'function') {
+            bngApi.engineLua('extensions.load("beamPlayPosition")');
+          }
 
-          $scope.screen = 'home';
+          $scope.screen = 'drive';
           $scope.unitMode = 'metric';
           $scope.use24h = true;
           $scope.dayNight = 'day';
@@ -341,6 +438,17 @@ if (typeof angular !== 'undefined') {
           $scope.fuelPct = null;
           $scope.waterTempText = '--';
           $scope.oilTempText = '--';
+
+          $scope.tickerText = '';
+          $scope.positionAvailable = false;
+          $scope.headingText = '--';
+          $scope.trailPath = '';
+          $scope.trailCurrentX = 150;
+          $scope.trailCurrentY = 90;
+          var positionTrail = [];
+          var TRAIL_VIEW_W = 300;
+          var TRAIL_VIEW_H = 180;
+          var TRAIL_MAX_POINTS = 200;
 
           $scope.stations = RADIO_STATIONS;
           $scope.stationIndex = 0;
@@ -466,7 +574,7 @@ if (typeof angular !== 'undefined') {
           }, 500);
 
           $scope.goTo = function (screen) { $scope.screen = screen; };
-          $scope.goHome = function () { $scope.screen = 'home'; };
+          $scope.goHome = function () { $scope.screen = 'drive'; };
 
           $scope.setUnitMode = function (mode) { $scope.unitMode = mode; saveSettings(); };
           $scope.toggleClockFormat = function () { $scope.use24h = !$scope.use24h; saveSettings(); };
@@ -572,10 +680,10 @@ if (typeof angular !== 'undefined') {
           // --- Telemetry ---
           $scope.$on('streamsUpdate', function (event, streams) {
             if (!streams) return;
-            updateFromStreams(streams.electrics, streams.engineInfo);
+            updateFromStreams(streams.electrics, streams.engineInfo, streams.beamPlayPosition);
           });
 
-          function updateFromStreams(electrics, engineInfo) {
+          function updateFromStreams(electrics, engineInfo, position) {
             var speedMps = readSpeedMps(electrics);
             var speed = convertSpeed(speedMps, $scope.unitMode);
             $scope.speedValue = Math.round(speed.value);
@@ -614,6 +722,27 @@ if (typeof angular !== 'undefined') {
             var avgConverted = $scope.unitMode === 'imperial' ? avgKmh / KM_PER_MILE : avgKmh;
             $scope.tripAvgSpeedText = avgConverted.toFixed(1) + ' ' + speed.unit;
 
+            $scope.positionAvailable = !!(position && position.available);
+            if ($scope.positionAvailable) {
+              positionTrail = updatePositionTrail(positionTrail, { x: position.x, y: position.y }, TRAIL_MAX_POINTS);
+              $scope.headingText = headingToCompass(position.heading);
+            } else {
+              $scope.headingText = '--';
+            }
+            var trailView = buildTrailView(positionTrail, TRAIL_VIEW_W, TRAIL_VIEW_H, 12);
+            $scope.trailPath = trailView.path;
+            $scope.trailCurrentX = trailView.currentX;
+            $scope.trailCurrentY = trailView.currentY;
+
+            $scope.tickerText = buildStatusTicker({
+              speedValue: $scope.speedValue,
+              speedUnit: $scope.speedUnit,
+              gearText: $scope.gearText,
+              rpmPct: $scope.rpmPct,
+              fuelPctText: $scope.fuelPctText,
+              waterTempText: $scope.waterTempText
+            });
+
             if ($scope.companionStatus === 'on' && bngApi && typeof bngApi.engineLua === 'function') {
               var payload = buildCompanionPayload({
                 engineOn: $scope.engineOn,
@@ -630,7 +759,14 @@ if (typeof angular !== 'undefined') {
                 tripDurationText: $scope.tripDurationText,
                 tripAvgSpeedText: $scope.tripAvgSpeedText,
                 topSpeedText: $scope.topSpeedText,
-                unitMode: $scope.unitMode
+                unitMode: $scope.unitMode,
+                tickerText: $scope.tickerText,
+                position: {
+                  available: $scope.positionAvailable,
+                  x: $scope.positionAvailable ? position.x : null,
+                  y: $scope.positionAvailable ? position.y : null,
+                  headingText: $scope.headingText
+                }
               });
               bngApi.engineLua('extensions.beamPlayServer.setData(' + JSON.stringify(JSON.stringify(payload)) + ')');
             }

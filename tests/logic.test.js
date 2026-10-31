@@ -152,3 +152,76 @@ test('noteFrequency: semitone math (octave up doubles frequency)', () => {
   assert.ok(Math.abs(app.noteFrequency(220, 12) - 440) < 1e-9);
   assert.equal(app.noteFrequency(220, 0), 220);
 });
+
+test('updatePositionTrail: appends, throttles by distance, trims to maxPoints', () => {
+  let trail = [];
+  trail = app.updatePositionTrail(trail, { x: 0, y: 0 }, 5);
+  assert.deepEqual(trail, [{ x: 0, y: 0 }]);
+
+  // Sub-threshold move: not appended.
+  trail = app.updatePositionTrail(trail, { x: 0.1, y: 0 }, 5);
+  assert.equal(trail.length, 1);
+
+  // Past the 0.5m threshold: appended.
+  trail = app.updatePositionTrail(trail, { x: 1, y: 0 }, 5);
+  assert.equal(trail.length, 2);
+  assert.deepEqual(trail[1], { x: 1, y: 0 });
+
+  // Trims to maxPoints, keeping the most recent.
+  for (let i = 2; i <= 10; i++) {
+    trail = app.updatePositionTrail(trail, { x: i, y: 0 }, 5);
+  }
+  assert.equal(trail.length, 5);
+  assert.deepEqual(trail[trail.length - 1], { x: 10, y: 0 });
+});
+
+test('updatePositionTrail: ignores a point with non-finite coordinates', () => {
+  const trail = app.updatePositionTrail([{ x: 0, y: 0 }], { x: NaN, y: 5 }, 10);
+  assert.equal(trail.length, 1);
+});
+
+test('buildTrailView: empty/single-point trail has no path, centers the dot', () => {
+  const empty = app.buildTrailView([], 100, 60);
+  assert.equal(empty.path, '');
+  assert.equal(empty.hasData, false);
+  assert.equal(empty.currentX, 50);
+  assert.equal(empty.currentY, 30);
+
+  const single = app.buildTrailView([{ x: 5, y: 5 }], 100, 60);
+  assert.equal(single.path, '');
+  assert.equal(single.hasData, true);
+});
+
+test('buildTrailView: multi-point trail produces an SVG path and a current-position dot', () => {
+  const trail = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }];
+  const view = app.buildTrailView(trail, 100, 100, 10);
+  assert.ok(view.hasData);
+  assert.match(view.path, /^M[\d.]+,[\d.]+ L[\d.]+,[\d.]+ L[\d.]+,[\d.]+$/);
+  // Current point is the trail's last entry -- furthest "up" (max y) and
+  // right (max x), so after the Y-flip it should land near the top-right.
+  assert.ok(view.currentX > 50);
+  assert.ok(view.currentY < 50);
+});
+
+test('headingToCompass: cardinal/ordinal directions and wraparound', () => {
+  assert.equal(app.headingToCompass(0), 'N');
+  assert.equal(app.headingToCompass(45), 'NE');
+  assert.equal(app.headingToCompass(90), 'E');
+  assert.equal(app.headingToCompass(180), 'S');
+  assert.equal(app.headingToCompass(359), 'N');
+  assert.equal(app.headingToCompass(-45), 'NW');
+  assert.equal(app.headingToCompass(undefined), '--');
+  assert.equal(app.headingToCompass(NaN), '--');
+});
+
+test('buildStatusTicker: joins only the fields that are present', () => {
+  const full = app.buildStatusTicker({
+    speedValue: 58, speedUnit: 'mph', gearText: '4', rpmPct: 62,
+    fuelPctText: '58%', waterTempText: '89°C'
+  });
+  assert.equal(full, '58 mph  ·  Gear 4  ·  62% RPM  ·  Fuel 58%  ·  89°C water');
+
+  assert.equal(app.buildStatusTicker({}), '');
+  assert.equal(app.buildStatusTicker({ fuelPctText: '--', waterTempText: '--' }), '');
+  assert.equal(app.buildStatusTicker(), '');
+});
