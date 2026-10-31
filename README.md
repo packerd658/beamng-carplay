@@ -50,6 +50,19 @@ both would be a separate iOS project unrelated to this one. The phone
 companion below gets you the "second screen in your hand" experience over
 your own WiFi instead, with no Apple gatekeeping involved.
 
+## Compatibility
+
+Last checked against **BeamNG.drive 0.39.x** (October 2026). The
+`electrics` field names and `engineInfo` array indices this mod reads
+(documented in [Notes on the underlying BeamNG UI
+API](#notes-on-the-underlying-beamng-ui-api) below) are internal,
+undocumented parts of BeamNG's API that can change between versions
+without notice. This line is updated roughly monthly as new BeamNG
+versions ship; if something here breaks after a game update before that
+happens, please open an issue.
+
+<!-- beamng-version-check: last verified 2026-10-31 against BeamNG.drive 0.39.x -->
+
 ## Install (2 minutes)
 
 BeamNG UI apps live in the game's `ui/modules/apps/` folder, and this mod's
