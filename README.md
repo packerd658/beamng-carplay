@@ -54,16 +54,30 @@ your own WiFi instead, with no Apple gatekeeping involved.
 
 ## Compatibility
 
-Last checked against **BeamNG.drive 0.39.x** (October 2026). The
+Last checked against **BeamNG.drive 0.40.x** (November 2026). The
 `electrics` field names and `engineInfo` array indices this mod reads
 (documented in [Notes on the underlying BeamNG UI
 API](#notes-on-the-underlying-beamng-ui-api) below) are internal,
 undocumented parts of BeamNG's API that can change between versions
-without notice. This line is updated roughly monthly as new BeamNG
-versions ship; if something here breaks after a game update before that
-happens, please open an issue.
+without notice.
 
-<!-- beamng-version-check: last verified 2026-10-31 against BeamNG.drive 0.39.x -->
+**Known open risk, unverified either way:** starting with BeamNG.drive
+0.39, the game's core UI was migrated from AngularJS to Vue, and the old
+"UI Apps" mechanism BeamPlay is built on was renamed to "HUD Apps" in the
+process. Public patch notes describe this as an incremental migration and
+don't say whether third-party mods still using the legacy
+`angular.module('beamng.apps')` registration (which BeamPlay does) keep
+loading as-is, or need porting to Vue. This hasn't been confirmed against
+a real 0.40 install from this development environment. **If BeamPlay
+doesn't show up in the in-game Apps picker at all** on a current install,
+this migration is the most likely cause — please open an issue, ideally
+with whatever the F11 Lua console shows when the game loads.
+
+This line is updated roughly monthly as new BeamNG versions ship; if
+something here breaks after a game update before that happens, please
+open an issue.
+
+<!-- beamng-version-check: last verified 2026-11-01 against BeamNG.drive 0.40.x -->
 
 ## Install (2 minutes)
 
